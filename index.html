@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Biblically Accurate Angels</title>
+
+    <!-- React & ReactDOM CDN -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+
+    <!-- Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  </head>
+
+  <body>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+      }
+
+      .app {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 16px;
+      }
+
+      .board {
+        position: relative;
+        display: grid;
+        grid-template-columns: repeat(15, 50px);
+        grid-template-rows: repeat(15, 50px);
+        border: 2px solid #222;
+        background: #111;
+      }
+
+      .score {
+        font-size: 24px;
+        font-weight: bold;
+      }
+
+      .message {
+        min-height: 24px;
+        font-weight: bold;
+      }
+
+      .controls {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+
+      button {
+        padding: 8px 14px;
+        cursor: pointer;
+      }
+
+      .overlay {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.6);
+        color: white;
+        font-size: 24px;
+        font-weight: bold;
+      }
+    </style>
+
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const root = document.getElementById("root");
+      const reactRoot = ReactDOM.createRoot(root);
+      const BOARD_SIZE = 15;
+      const INITIAL_SNAKE = [
+        { x: 7, y: 8 },
+        { x: 6, y: 8 },
+        { x: 5, y: 8 },
+      ];
+
+      const getRandomFood = (snake) => {
+        let food = null;
+
+        while (!food) {
+          const candidate = {
+            x: Math.floor(Math.random() * BOARD_SIZE) + 1,
+            y: Math.floor(Math.random() * BOARD_SIZE) + 1,
+          };
+
+          const onSnake = snake.some(
+            (part) => part.x === candidate.x && part.y === candidate.y
+          );
+
+          if (!onSnake) {
+            food = candidate;
+          }
+        }
+
+        return food;
+      };
+
+      const Segment = ({ x, y, isHead }) => {
+        const style = {
+          width: "50px",
+          height: "50px",
+          background: isHead ? "darkgreen" : "green",
+          boxSizing: "border-box",
+          border: "1px dashed lime",
+          gridColumn: x,
+          gridRow: y,
+          transition: "all 0.15s linear",
+        };
+
+        return <div style={style} />;
+      };
+
+      const Snake = ({ snake }) => {
+        return (
+          <>
+            {snake.map((part, index) => (
+              <Segment
+                key={index}
+                x={part.x}
+                y={part.y}
+                isHead={index === 0}
+              />
+            ))}
+          </>
+        );
+      };
+
+      const Food = ({ food }) => {
+        const style = {
+          width: "50px",
+          height: "50px",
+          background: "crimson",
+          borderRadius: "50%",
+          boxSizing: "border-box",
+          border: "4px solid pink",
+          gridColumn: food.x,
+          gridRow: food.y,
+          transition: "all 0.15s linear",
+        };
+
+        return <div style={style} />;
+      };
+
+      const Score = ({ score, level }) => {
+        return (
+          <div className="score">
+            Score: {score} | Nivel: {level}
+          </div>
+        );
+      };
+
+      const Board = ({ snake, food, gameOver, started }) => {
+        return (
+          <main className="board">
+            <Snake snake={snake} />
+            <Food food={food} />
+            {!started && <div className="overlay">Presiona iniciar</div>}
+            {gameOver && <div className="overlay">Game Over</div>}
+          </main>
+        );
+      };
+
+      const Game = () => {
+        const [direction, setDirection] = React.useState("ArrowRight");
+        const [snake, setSnake] = React.useState(INITIAL_SNAKE);
+        const [food, setFood] = React.useState(() =>
+          getRandomFood(INITIAL_SNAKE)
+        );
+        const [score, setScore] = React.useState(0);
+        const [gameOver, setGameOver] = React.useState(false);
+        const [started, setStarted] = React.useState(false);
+
+        const level = Math.floor(score / 3) + 1;
+        const speed = Math.max(80, 200 - (level - 1) * 15);
+
+        const resetGame = () => {
+          setDirection("ArrowRight");
+          setSnake(INITIAL_SNAKE);
+          setFood(getRandomFood(INITIAL_SNAKE));
+          setScore(0);
+          setGameOver(false);
+          setStarted(true);
+        };
+
+        // Teclado → dirección
+        React.useEffect(() => {
+          const handleKeyDown = (e) => {
+            if (!started) {
+              setStarted(true);
+            }
+
+            if (gameOver) {
+              return;
+            }
+
+            if (
+              e.key === "ArrowUp" ||
+              e.key === "ArrowDown" ||
+              e.key === "ArrowLeft" ||
+              e.key === "ArrowRight"
+            ) {
+              setDirection((prevDirection) => {
+                const opposites = {
+                  ArrowUp: "ArrowDown",
+                  ArrowDown: "ArrowUp",
+                  ArrowLeft: "ArrowRight",
+                  ArrowRight: "ArrowLeft",
+                };
+
+                return opposites[prevDirection] === e.key
+                  ? prevDirection
+                  : e.key;
+              });
+            }
+          };
+
+          window.addEventListener("keydown", handleKeyDown);
+          return () =>
+            window.removeEventListener("keydown", handleKeyDown);
+        }, [gameOver, started]);
+
+        // Movimiento
+        React.useEffect(() => {
+          if (!started || gameOver) {
+            return;
+          }
+
+          const i = setInterval(() => {
+            setSnake((prev) => {
+              const head = prev[0];
+              let newHead = { x: null, y: null };
+
+              switch (direction) {
+                case "ArrowRight":
+                  newHead = { x: head.x + 1, y: head.y };
+                  break;
+                case "ArrowLeft":
+                  newHead = { x: head.x - 1, y: head.y };
+                  break;
+                case "ArrowUp":
+                  newHead = { x: head.x, y: head.y - 1 };
+                  break;
+                case "ArrowDown":
+                  newHead = { x: head.x, y: head.y + 1 };
+                  break;
+              }
+
+              const hitsWall =
+                newHead.x < 1 ||
+                newHead.x > BOARD_SIZE ||
+                newHead.y < 1 ||
+                newHead.y > BOARD_SIZE;
+
+              const bodyWithoutTail = prev.slice(0, prev.length - 1);
+              const hitsSelf = bodyWithoutTail.some(
+                (part) => part.x === newHead.x && part.y === newHead.y
+              );
+
+              if (hitsWall || hitsSelf) {
+                setGameOver(true);
+                return prev;
+              }
+
+              const ateFood =
+                newHead.x === food.x && newHead.y === food.y;
+
+              const nextSnake = ateFood
+                ? [newHead, ...prev]
+                : [newHead, ...prev.slice(0, prev.length - 1)];
+
+              if (ateFood) {
+                setScore((current) => current + 1);
+                setFood(getRandomFood(nextSnake));
+              }
+
+              return nextSnake;
+            });
+          }, speed);
+
+          return () => clearInterval(i);
+        }, [direction, food, gameOver, speed, started]);
+
+        return (
+          <div className="app">
+            <Score
+              score={score}
+              level={level}
+            />
+            <div className="controls">
+              <button onClick={() => setStarted(true)}>Iniciar</button>
+              <button onClick={resetGame}>Reiniciar</button>
+            </div>
+            <div className="message">
+              {!gameOver
+                ? "Usa las flechas para mover la serpiente"
+                : "Perdiste. Presiona reiniciar"}
+            </div>
+            <Board
+              snake={snake}
+              food={food}
+              gameOver={gameOver}
+              started={started}
+            />
+          </div>
+        );
+      };
+
+      const App = () => {
+        return <Game />;
+      };
+
+      reactRoot.render(<App />);
+    </script>
+  </body>
+</html>
