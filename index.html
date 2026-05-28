@@ -80,6 +80,16 @@
         { x: 6, y: 8 },
         { x: 5, y: 8 },
       ];
+      const KEY_TO_DIRECTION = {
+        ArrowUp: "ArrowUp",
+        ArrowDown: "ArrowDown",
+        ArrowLeft: "ArrowLeft",
+        ArrowRight: "ArrowRight",
+        w: "ArrowUp",
+        s: "ArrowDown",
+        a: "ArrowLeft",
+        d: "ArrowRight",
+      };
 
       const getRandomFood = (snake) => {
         let food = null;
@@ -192,33 +202,32 @@
         // Teclado → dirección
         React.useEffect(() => {
           const handleKeyDown = (e) => {
+            const pressedKey =
+              e.key.length === 1 ? e.key.toLowerCase() : e.key;
+            const nextDirection = KEY_TO_DIRECTION[pressedKey];
+
+            if (!nextDirection || gameOver) {
+              return;
+            }
+
+            e.preventDefault();
+
             if (!started) {
               setStarted(true);
             }
 
-            if (gameOver) {
-              return;
-            }
+            setDirection((prevDirection) => {
+              const opposites = {
+                ArrowUp: "ArrowDown",
+                ArrowDown: "ArrowUp",
+                ArrowLeft: "ArrowRight",
+                ArrowRight: "ArrowLeft",
+              };
 
-            if (
-              e.key === "ArrowUp" ||
-              e.key === "ArrowDown" ||
-              e.key === "ArrowLeft" ||
-              e.key === "ArrowRight"
-            ) {
-              setDirection((prevDirection) => {
-                const opposites = {
-                  ArrowUp: "ArrowDown",
-                  ArrowDown: "ArrowUp",
-                  ArrowLeft: "ArrowRight",
-                  ArrowRight: "ArrowLeft",
-                };
-
-                return opposites[prevDirection] === e.key
-                  ? prevDirection
-                  : e.key;
-              });
-            }
+              return opposites[prevDirection] === nextDirection
+                ? prevDirection
+                : nextDirection;
+            });
           };
 
           window.addEventListener("keydown", handleKeyDown);
@@ -294,12 +303,12 @@
               level={level}
             />
             <div className="controls">
-              <button onClick={() => setStarted(true)}>Iniciar</button>
+              <button onClick={resetGame}>Iniciar</button>
               <button onClick={resetGame}>Reiniciar</button>
             </div>
             <div className="message">
               {!gameOver
-                ? "Usa las flechas para mover la serpiente"
+                ? "Usa las flechas o WASD para mover la serpiente"
                 : "Perdiste. Presiona reiniciar"}
             </div>
             <Board
