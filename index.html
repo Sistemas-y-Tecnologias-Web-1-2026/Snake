@@ -75,11 +75,22 @@
       const root = document.getElementById("root");
       const reactRoot = ReactDOM.createRoot(root);
       const BOARD_SIZE = 15;
+      const GAME_STATUS = {
+        MENU: "menu",
+        PLAYING: "playing",
+        GAME_OVER: "gameOver",
+      };
       const INITIAL_SNAKE = [
         { x: 7, y: 8 },
         { x: 6, y: 8 },
         { x: 5, y: 8 },
       ];
+      const DIRECTION_STEPS = {
+        ArrowUp: { x: 0, y: -1 },
+        ArrowDown: { x: 0, y: 1 },
+        ArrowLeft: { x: -1, y: 0 },
+        ArrowRight: { x: 1, y: 0 },
+      };
       const KEY_TO_DIRECTION = {
         ArrowUp: "ArrowUp",
         ArrowDown: "ArrowDown",
@@ -89,6 +100,16 @@
         s: "ArrowDown",
         a: "ArrowLeft",
         d: "ArrowRight",
+      };
+
+      const createInitialSnake = (direction = "ArrowRight") => {
+        const head = INITIAL_SNAKE[0];
+        const step = DIRECTION_STEPS[direction];
+
+        return INITIAL_SNAKE.map((_, index) => ({
+          x: head.x - step.x * index,
+          y: head.y - step.y * index,
+        }));
       };
 
       const getRandomFood = (snake) => {
@@ -166,37 +187,53 @@
         );
       };
 
-      const Board = ({ snake, food, gameOver, started }) => {
+      const Board = ({ snake, food, status }) => {
         return (
           <main className="board">
             <Snake snake={snake} />
             <Food food={food} />
-            {!started && <div className="overlay">Presiona iniciar</div>}
-            {gameOver && <div className="overlay">Game Over</div>}
+            {status === GAME_STATUS.MENU && (
+              <div className="overlay">Presiona iniciar</div>
+            )}
+            {status === GAME_STATUS.GAME_OVER && (
+              <div className="overlay">Game Over</div>
+            )}
           </main>
         );
       };
 
       const Game = () => {
         const [direction, setDirection] = React.useState("ArrowRight");
-        const [snake, setSnake] = React.useState(INITIAL_SNAKE);
+        const [snake, setSnake] = React.useState(() =>
+          createInitialSnake()
+        );
         const [food, setFood] = React.useState(() =>
-          getRandomFood(INITIAL_SNAKE)
+          getRandomFood(createInitialSnake())
         );
         const [score, setScore] = React.useState(0);
-        const [gameOver, setGameOver] = React.useState(false);
-        const [started, setStarted] = React.useState(false);
+        const [status, setStatus] = React.useState(GAME_STATUS.MENU);
 
         const level = Math.floor(score / 3) + 1;
         const speed = Math.max(80, 200 - (level - 1) * 15);
 
-        const resetGame = () => {
-          setDirection("ArrowRight");
-          setSnake(INITIAL_SNAKE);
-          setFood(getRandomFood(INITIAL_SNAKE));
+        const startGame = (initialDirection = "ArrowRight") => {
+          const initialSnake = createInitialSnake(initialDirection);
+
+          setDirection(initialDirection);
+          setSnake(initialSnake);
+          setFood(getRandomFood(initialSnake));
           setScore(0);
-          setGameOver(false);
-          setStarted(true);
+          setStatus(GAME_STATUS.PLAYING);
+        };
+
+        const showMenu = () => {
+          const initialSnake = createInitialSnake();
+
+          setDirection("ArrowRight");
+          setSnake(initialSnake);
+          setFood(getRandomFood(initialSnake));
+          setScore(0);
+          setStatus(GAME_STATUS.MENU);
         };
 
         // Teclado → dirección
@@ -206,14 +243,25 @@
               e.key.length === 1 ? e.key.toLowerCase() : e.key;
             const nextDirection = KEY_TO_DIRECTION[pressedKey];
 
-            if (!nextDirection || gameOver) {
+            if (pressedKey === "r" && status !== GAME_STATUS.MENU) {
+              e.preventDefault();
+              startGame();
+              return;
+            }
+
+            if (!nextDirection) {
               return;
             }
 
             e.preventDefault();
 
-            if (!started) {
-              setStarted(true);
+            if (status === GAME_STATUS.MENU) {
+              startGame(nextDirection);
+              return;
+            }
+
+            if (status === GAME_STATUS.GAME_OVER) {
+              return;
             }
 
             setDirection((prevDirection) => {
@@ -233,11 +281,11 @@
           window.addEventListener("keydown", handleKeyDown);
           return () =>
             window.removeEventListener("keydown", handleKeyDown);
-        }, [gameOver, started]);
+        }, [status]);
 
         // Movimiento
         React.useEffect(() => {
-          if (!started || gameOver) {
+          if (status !== GAME_STATUS.PLAYING) {
             return;
           }
 
@@ -273,7 +321,7 @@
               );
 
               if (hitsWall || hitsSelf) {
-                setGameOver(true);
+                setStatus(GAME_STATUS.GAME_OVER);
                 return prev;
               }
 
@@ -294,7 +342,16 @@
           }, speed);
 
           return () => clearInterval(i);
-        }, [direction, food, gameOver, speed, started]);
+        }, [direction, food, speed, status]);
+
+        const message = {
+          [GAME_STATUS.MENU]:
+            "Presiona iniciar o una tecla de movimiento para comenzar",
+          [GAME_STATUS.PLAYING]:
+            "Usa las flechas o WASD para mover la serpiente",
+          [GAME_STATUS.GAME_OVER]:
+            "Perdiste. Presiona jugar otra vez o R",
+        }[status];
 
         return (
           <div className="app">
@@ -303,19 +360,24 @@
               level={level}
             />
             <div className="controls">
-              <button onClick={resetGame}>Iniciar</button>
-              <button onClick={resetGame}>Reiniciar</button>
+              {status === GAME_STATUS.MENU && (
+                <button onClick={() => startGame()}>Iniciar</button>
+              )}
+              {status === GAME_STATUS.PLAYING && (
+                <button onClick={() => startGame()}>Reiniciar</button>
+              )}
+              {status === GAME_STATUS.GAME_OVER && (
+                <button onClick={() => startGame()}>Jugar otra vez</button>
+              )}
+              {status !== GAME_STATUS.MENU && (
+                <button onClick={showMenu}>Menú</button>
+              )}
             </div>
-            <div className="message">
-              {!gameOver
-                ? "Usa las flechas o WASD para mover la serpiente"
-                : "Perdiste. Presiona reiniciar"}
-            </div>
+            <div className="message">{message}</div>
             <Board
               snake={snake}
               food={food}
-              gameOver={gameOver}
-              started={started}
+              status={status}
             />
           </div>
         );
